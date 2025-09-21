@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Tuple
 
 @dataclass
 class TradingSignal:
