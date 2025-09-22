@@ -317,7 +317,7 @@ if __name__ == "__main__":
     }
 
     # 可以修改這個股票代碼來測試不同股票
-    stock_code = "2412"
+    stock_code = "2356"
     stock_ticker = f"{stock_code}.TW"
     stock_name = STOCK_MAP.get(stock_code, stock_code)
     
