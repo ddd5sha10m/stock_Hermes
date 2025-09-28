@@ -481,7 +481,8 @@ class NewsEmotionAnalyzer:
             response = requests.get(url, headers=headers, timeout=15)
             response.raise_for_status()
             response.encoding = 'utf-8'
-            
+            for chunk in response.iter_content(chunk_size=128,decode_unicode=True):
+                print(chunk,)
             soup = BeautifulSoup(response.text, 'html.parser')
             
             # 移除不需要的元素
