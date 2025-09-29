@@ -1,24 +1,17 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-股票技術分析可視化儀表板
-整合現有的技術分析系統，提供互動式Web界面
-"""
-
 import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import plotly.express as px
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
 import warnings
+import numpy as np
 warnings.filterwarnings('ignore')
 
-# 導入你現有的分析模組
+# 導入所有需要的分析模組
 from technical_analyzer import analyze_stock_technicals
-from main import calculate_technical_score
+from fundamental_analyzer import analyze_stock_fundamentals
+from main import calculate_technical_score # 我們仍然需要它來取得原始技術分數
 from trading_signals import TradingSignalGenerator
+from comprehensive_evaluator import ComprehensiveEvaluator
 from stock_list import STOCK_LIST
 
 # 設定頁面配置
@@ -64,20 +57,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 @st.cache_data(ttl=300)  # 快取5分鐘
-def load_stock_data(stock_code):
-    """載入並快取股票技術分析數據"""
-    try:
-        stock_ticker = f"{stock_code}.TW"
-        return analyze_stock_technicals(stock_ticker)
-    except Exception as e:
-        st.error(f"無法載入 {stock_code} 的數據: {e}")
-        return None
+def load_all_data(stock_code):
+    """一次性載入所有需要的數據 (技術面 + 基本面)"""
+    stock_ticker = f"{stock_code}.TW"
+    tech_data = analyze_stock_technicals(stock_ticker)
+    fundamental_data = analyze_stock_fundamentals(stock_ticker)
+    return tech_data, fundamental_data
 
 def create_candlestick_chart(data, stock_name):
     """創建K線圖with技術指標疊加"""
     
-    # 取最近100個交易日的數據
-    recent_data = data.tail(100).copy()
+    # 取最近365個交易日的數據
+    recent_data = data.tail(365).copy()
     
     # 創建子圖
     fig = make_subplots(
@@ -253,18 +244,24 @@ def create_candlestick_chart(data, stock_name):
     
     # 更新布局
     fig.update_layout(
-        title=f'{stock_name} 技術分析圖表',
-        xaxis_rangeslider_visible=False,
-        height=800,
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
+    title=dict(
+        text=f"{stock_name} 技術分析圖表",
+        x=0.5,   # 水平置中
+        y=0.98,  # 調高一點
+        xanchor="center",
+        yanchor="top"
+    ),
+    xaxis_rangeslider_visible=False,
+    height=850,
+    showlegend=True,
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="right",
+        x=1
     )
+)
     
     # 更新x軸
     fig.update_xaxes(showgrid=True, gridwidth=0.5, gridcolor='lightgray')
@@ -272,50 +269,34 @@ def create_candlestick_chart(data, stock_name):
     
     return fig
 
-def create_score_radar_chart(score_breakdown):
-    """創建評分雷達圖"""
-    
-    # 定義評分維度（這需要根據你的評分系統調整）
-    categories = ['趨勢分析', '動量指標', '布林通道', '成交量分析', '交叉訊號', '多空平衡']
-    
-    # 模擬各維度分數（實際使用時需要從score_breakdown中提取）
-    scores = [75, 68, 82, 60, 45, 70]  # 這裡需要實際解析你的評分詳情
+def create_evaluation_radar_chart(fund_result, tech_result, risk_result, momentum_result):
+    """【全新】創建綜合評估雷達圖"""
+    categories = ['基本面', '技術面', '風險面', '動能面']
+    scores = [
+        fund_result['score'],
+        tech_result['score'],
+        risk_result['score'],
+        momentum_result['score']
+    ]
     
     fig = go.Figure()
-    
     fig.add_trace(go.Scatterpolar(
-        r=scores + [scores[0]],  # 閉合圖形
+        r=scores + [scores[0]],
         theta=categories + [categories[0]],
         fill='toself',
-        name='當前評分',
-        fillcolor='rgba(255, 99, 71, 0.2)',
-        line=dict(color='rgba(255, 99, 71, 0.8)', width=2)
-    ))
-    
-    # 添加滿分參考線
-    fig.add_trace(go.Scatterpolar(
-        r=[100] * (len(categories) + 1),
-        theta=categories + [categories[0]],
-        fill='toself',
-        name='滿分參考',
-        fillcolor='rgba(0, 0, 0, 0.05)',
-        line=dict(color='rgba(0, 0, 0, 0.3)', width=1, dash='dash')
+        name='綜合評估',
+        fillcolor='rgba(78, 205, 196, 0.2)',
+        line=dict(color='rgba(78, 205, 196, 0.8)', width=2)
     ))
     
     fig.update_layout(
-        polar=dict(
-            radialaxis=dict(
-                visible=True,
-                range=[0, 100],
-                tickfont=dict(size=10)
-            )
-        ),
-        showlegend=True,
-        title="技術分析各維度評分",
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+        showlegend=False,
+        title="四大維度評估雷達圖",
         height=400
     )
-    
     return fig
+
 
 def create_risk_reward_gauge(confidence, volatility_risk):
     """創建風險報酬儀表圖"""
@@ -376,200 +357,116 @@ def create_risk_reward_gauge(confidence, volatility_risk):
     return fig
 
 def main():
-    """主程式"""
+    st.title("💎 投資荷米斯 - 綜合投資價值評估儀表板")
     
-    st.title("📈 股票荷米斯 - 股票技術分析儀表板")
-    st.markdown("---")
-    
-    # 側邊欄 - 股票選擇
     with st.sidebar:
-        st.header("🔍 股票選擇")
-        
-        # 建立反向對照表 (名稱 -> 代碼)
+        st.header("⚙️ 分析設定")
         stock_options = {f"{code} - {name}": code for code, name in STOCK_LIST.items()}
-        
-        selected_option = st.selectbox(
-            "選擇要分析的股票:",
-            options=list(stock_options.keys()),
-            index=0
-        )
-        
+        selected_option = st.selectbox("選擇要分析的股票:", options=list(stock_options.keys()), index=0)
         stock_code = stock_options[selected_option]
         stock_name = STOCK_LIST[stock_code]
-        
-        st.info(f"已選擇: {stock_code} {stock_name}")
-        
-        # 分析按鈕
-        analyze_button = st.button("🚀 開始分析", type="primary")
-        
-        st.markdown("---")
-        st.markdown("### 📊 快速說明")
-        st.markdown("""
-        - **K線圖**: 顯示價格走勢與技術指標
-        - **評分雷達圖**: 各維度技術分析評分
-        - **信心度儀表**: 交易訊號可信度
-        - **詳細數據**: 完整的分析結果
-        """)
+        analyze_button = st.button("🚀 開始評估", type="primary", use_container_width=True)
     
-    # 主要內容區域
-    if analyze_button:
-        
-        with st.spinner(f"正在分析 {stock_code} {stock_name}..."):
-            
-            # 載入數據
-            tech_data = load_stock_data(stock_code)
-            
-            if tech_data is None or tech_data.empty:
-                st.error("❌ 無法載入股票數據，請檢查網路連線或股票代碼")
-                return
-            
-            # 計算技術評分
-            technical_score, scoring_details = calculate_technical_score(tech_data)
-            
-            # 生成交易訊號
-            signal_generator = TradingSignalGenerator()
-            trading_signal = signal_generator.generate_signal(tech_data, technical_score)
-            
-            # 獲取最新數據
-            latest_data = tech_data.iloc[-1]
-            
-        # 顯示結果
-        st.success(f"✅ {stock_name} 分析完成！")
-        
-        # 第一行：關鍵指標
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric(
-                label="技術評分",
-                value=f"{technical_score}/100",
-                delta=f"{technical_score-50}" if technical_score >= 50 else f"{technical_score-50}"
-            )
-        
-        with col2:
-            st.metric(
-                label="收盤價",
-                value=f"${latest_data['Close']:.2f}",
-                delta=f"{((latest_data['Close']/latest_data['Close'])-1)*100:.2f}%" if len(tech_data) > 1 else None
-            )
-        
-        with col3:
-            signal_color = "🟢" if trading_signal.signal_type == "BUY" else "🔴" if trading_signal.signal_type == "SELL" else "🟡"
-            st.metric(
-                label="交易訊號",
-                value=f"{signal_color} {trading_signal.signal_type}",
-                delta=f"信心度 {trading_signal.confidence:.0f}%"
-            )
-        
-        with col4:
-            volatility_risk = latest_data.get('Volatility_Risk', 0)
-            st.metric(
-                label="波動率風險",
-                value=f"{volatility_risk:.2f}%",
-                delta="高風險" if volatility_risk > 7 else "中等風險" if volatility_risk > 3 else "低風險"
-            )
-        
+    if not analyze_button:
+        st.info("👈 請在左側選擇股票並點擊「開始評估」按鈕")
         st.markdown("---")
+        st.image("/Users/wdwddaniel/Downloads/stockH.png")
+        return
+
+    with st.spinner(f"正在為 {stock_code} {stock_name} 進行深度評估..."):
+        # 1. 載入所有數據
+        tech_data, fundamental_data = load_all_data(stock_code)
+        if tech_data is None or tech_data.empty:
+            st.error(f"❌ 無法獲取 {stock_code} 的技術資料，無法產生報告。")
+            return
+
+        # 2. 執行所有必要的計算與評估
+        technical_score, _ = calculate_technical_score(tech_data)
+        signal_generator = TradingSignalGenerator()
+        trading_signal = signal_generator.generate_signal(tech_data, technical_score)
         
-        # 第二行：圖表區域
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            st.subheader("📊 K線圖與技術指標")
-            candlestick_chart = create_candlestick_chart(tech_data, stock_name)
-            st.plotly_chart(candlestick_chart, use_container_width=True)
-        
-        with col2:
-            st.subheader("🎯 評分分析")
-            
-            # 雷達圖
-            radar_chart = create_score_radar_chart(scoring_details)
-            st.plotly_chart(radar_chart, use_container_width=True)
-            
-            # 風險報酬儀表
-            st.subheader("⚖️ 風險評估")
-            gauge_chart = create_risk_reward_gauge(trading_signal.confidence, volatility_risk)
-            st.plotly_chart(gauge_chart, use_container_width=True)
-        
-        st.markdown("---")
-        
-        # 第三行：詳細分析
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📋 評分詳細說明")
-            for i, detail in enumerate(scoring_details, 1):
-                st.write(f"{i}. {detail}")
-        
-        with col2:
-            st.subheader("💡 交易建議")
-            
-            # 交易訊號框
-            signal_class = f"{trading_signal.signal_type.lower()}-signal"
-            st.markdown(f"""
-            <div class="metric-container {signal_class}">
-                <h4>🎯 交易訊號: {trading_signal.signal_type}</h4>
-                <p><strong>信心度:</strong> {trading_signal.confidence:.0f}%</p>
-                <p><strong>建議持有期:</strong> {trading_signal.holding_period}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # 具體操作建議
-            if trading_signal.signal_type != 'HOLD':
-                st.write("**💰 具體操作建議:**")
-                st.write(f"- 進場價位: ${trading_signal.entry_price}")
-                st.write(f"- 停損價位: ${trading_signal.stop_loss}")
-                if trading_signal.take_profit:
-                    st.write("- 獲利了結:")
-                    for i, tp in enumerate(trading_signal.take_profit, 1):
-                        percentage = ((tp - trading_signal.entry_price) / trading_signal.entry_price) * 100
-                        st.write(f"  第{i}批: ${tp} (+{percentage:.1f}%)")
-            
-            # 風險警告
-            if trading_signal.warnings:
-                st.write("**⚠️ 風險警告:**")
-                for warning in trading_signal.warnings:
-                    st.warning(warning)
-        
-        st.markdown("---")
-        
-        # 免責聲明
-        st.markdown("""
-        ### ⚠️ 重要提醒
-        - 本分析僅供參考，不構成投資建議
-        - 市場有風險，投資需謹慎
-        - 請結合基本面分析做出最終決策
-        - 務必做好風險管理和資金控制
-        """)
+        evaluator = ComprehensiveEvaluator()
+        fund_score, fund_result = evaluator.evaluate_fundamental_quality(fundamental_data)
+        tech_score_norm, tech_result = evaluator.evaluate_technical_strength(tech_data, technical_score)
+        risk_score, risk_result = evaluator.evaluate_risk_profile(tech_data, fundamental_data)
+        momentum_score, momentum_result = evaluator.evaluate_momentum(tech_data)
+        evaluation = evaluator.generate_comprehensive_evaluation(tech_data, technical_score, fundamental_data, trading_signal)
     
-    else:
-        st.info("👈 請在左側選擇股票並點擊「開始分析」按鈕")
+    st.success(f"✅ {stock_code} {stock_name} 評估完成！")
+
+    # --- 儀表板佈局 ---
+    
+    # 頂層總覽
+    st.header(f"💎 {evaluation.investment_grade}")
+    st.markdown(f"**核心投資論點:** *{evaluation.core_thesis}*")
+
+    # 四大關鍵指標
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("綜合評分", f"{evaluation.overall_score}/100", delta=f"{evaluation.overall_score - 50:.1f}")
+    col2.metric("風險等級", evaluation.risk_level)
+    col3.metric("倉位建議", evaluation.position_suggestion)
+    col4.metric("建議投資期間", evaluation.time_horizon)
+    
+    st.markdown("---")
+
+    # 中層圖表與關鍵點
+    left_col, right_col = st.columns([2, 1.2])
+    with left_col:
+        st.subheader("📈 K線圖與技術指標")
+        candlestick_chart = create_candlestick_chart(tech_data, stock_name)
+        st.plotly_chart(candlestick_chart, use_container_width=True)
         
-        # 顯示範例圖片或說明
-        st.markdown("""
-        ## 📈 功能特色
-        
-        ### 🎯 技術分析整合
-        - 完整的K線圖與技術指標疊加
-        - MA、MACD、RSI、KD、布林通道等主流指標
-        - 自動識別關鍵支撐壓力位
-        
-        ### 📊 智能評分系統
-        - 多維度技術分析評分
-        - 雷達圖視覺化展示各維度表現
-        - 動態風險調整機制
-        
-        ### 🚀 交易訊號預測
-        - AI智能交易訊號生成
-        - 信心度量化評估
-        - 具體進出場點位建議
-        - 風險報酬比計算
-        
-        ### 🔍 實時數據更新
-        - 即時股價數據獲取
-        - 快取機制提升載入速度
-        - 支援台股上市櫃股票
-        """)
+    with right_col:
+        st.subheader("🎯 四大維度評估")
+        radar_chart = create_evaluation_radar_chart(fund_result, tech_result, risk_result, momentum_result)
+        st.plotly_chart(radar_chart, use_container_width=True)
+
+        with st.container():
+            st.markdown("**✅ 主要優勢:**")
+            for strength in evaluation.key_strengths:
+                st.markdown(f" - {strength}")
+            
+            st.markdown("**⚠️ 主要風險:**")
+            for risk in evaluation.key_risks:
+                st.markdown(f" - {risk}")
+
+    st.markdown("---")
+
+    # 底層詳細報告
+    st.subheader("📋 詳細分析與建議")
+    tab1, tab2, tab3, tab4 = st.tabs(["🎯 交易訊號", "🏦 基本面分析", "📊 技術面分析", "👀 監控重點"])
+
+    with tab1:
+        st.markdown(f"#### {trading_signal.signal_type} ({trading_signal.confidence:.0f}% 信心度)")
+        if trading_signal.signal_type != 'HOLD':
+            c1, c2, c3 = st.columns(3)
+            c1.metric("建議進場價", f"${trading_signal.entry_price}")
+            c2.metric("建議停損價", f"${trading_signal.stop_loss}")
+            c3.metric("風險報酬比", f"1:{trading_signal.risk_reward_ratio}")
+        st.markdown("**訊號依據:**")
+        for reason in trading_signal.reasons:
+            st.markdown(f"- {reason}")
+        if trading_signal.warnings:
+            st.markdown("**風險警告:**")
+            for warning in trading_signal.warnings:
+                st.warning(warning)
+    
+    with tab2:
+        st.markdown(f"#### 基本面評分: {fund_result['score']}/100 (等級: {fund_result['grade']})")
+        for detail in fund_result['details']:
+            st.markdown(f"- {detail}")
+
+    with tab3:
+        st.markdown(f"#### 技術面評分: {tech_result['score']}/100 (趨勢: {tech_result['strength']})")
+        # 這裡我們直接使用 main.py 產出的 tech_details
+        _, tech_details = calculate_technical_score(tech_data)
+        for detail in tech_details:
+            st.markdown(f"- {detail}")
+            
+    with tab4:
+        st.markdown("#### 建議持續關注以下指標變化:")
+        for point in evaluation.monitoring_points:
+            st.markdown(f"- {point}")
 
 if __name__ == "__main__":
     main()

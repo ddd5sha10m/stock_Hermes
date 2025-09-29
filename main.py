@@ -1,8 +1,9 @@
 # main.py - 完整優化版 (含交易訊號預測)
 
 from technical_analyzer import analyze_stock_technicals
+from fundamental_analyzer import analyze_stock_fundamentals
 from trading_signals import TradingSignalGenerator, format_trading_signal
-
+from comprehensive_evaluator import ComprehensiveEvaluator, format_comprehensive_report
 def check_score_signal_consistency(score: int, signal) -> dict:
     """檢查技術評分與交易訊號的一致性"""
     
@@ -33,6 +34,42 @@ def check_score_signal_consistency(score: int, signal) -> dict:
         'actual_signal': signal.signal_type,
         'explanation': explanation
     }
+
+def calculate_fundamental_score(data):
+    """根據基本面數據計算綜合分數"""
+    if data is None:
+        return 0, ["基本面數據不足"]
+    
+    score = 0
+    details = []
+    
+    # 1. 獲利能力 (40分)
+    if data.get("ROE", 0) > 15: score += 15; details.append(f"高ROE: {data['ROE']:.1f}% (+15)")
+    elif data.get("ROE", 0) > 8: score += 8; details.append(f"良好ROE: {data['ROE']:.1f}% (+8)")
+    
+    if data.get("毛利率", 0) > 30: score += 10; details.append(f"高毛利率: {data['毛利率']:.1f}% (+10)")
+    elif data.get("毛利率", 0) > 15: score += 5; details.append(f"尚可毛利率: {data['毛利率']:.1f}% (+5)")
+
+    if data.get("營業利益率", 0) > 10: score += 10; details.append(f"高營業利益率: {data['營業利益率']:.1f}% (+10)")
+    elif data.get("營業利益率", 0) > 5: score += 5; details.append(f"尚可營業利益率: {data['營業利益率']:.1f}% (+5)")
+    
+    if data.get("EPS", 0) > 0: score += 5; details.append(f"EPS為正: {data['EPS']:.2f} (+5)")
+
+    # 2. 成長性 (20分)
+    if data.get("營收成長率", 0) > 10: score += 20; details.append(f"高速營收成長: {data['營收成長率']:.1f}% (+20)")
+    elif data.get("營收成長率", 0) > 0: score += 10; details.append(f"營收正成長: {data['營收成長率']:.1f}% (+10)")
+    
+    # 3. 財務健康 (25分)
+    if data.get("負債比率", 100) < 50: score += 10; details.append(f"低負債比: {data['負債比率']:.1f}% (+10)")
+    if data.get("流動比率", 0) > 2: score += 8; details.append(f"高流動比率: {data['流動比率']:.1f} (+8)")
+    if data.get("自由現金流", 0) > 0: score += 7; details.append(f"自由現金流為正 (+7)")
+
+    # 4. 價值評估 (15分)
+    pe = data.get("本益比", 999)
+    if 0 < pe <= 15: score += 15; details.append(f"價值區間本益比: {pe:.1f} (+15)")
+    elif 15 < pe <= 25: score += 8; details.append(f"合理本益比: {pe:.1f} (+8)")
+        
+    return int(score), details
 
 def calculate_technical_score(data):
     """
@@ -306,7 +343,7 @@ def generate_investment_advice(score, details, data):
             advice.append("⚠️ 高風險：該股波動較大，請控制倉位")
     
     return advice
-
+'''
 # --- 主程式執行 ---
 if __name__ == "__main__":
     STOCK_MAP = {
@@ -339,7 +376,33 @@ if __name__ == "__main__":
     print("="*60+"\n")
     # 執行技術分析
     tech_data = analyze_stock_technicals(stock_ticker)
+    fundamental_data = analyze_stock_fundamentals(stock_ticker)
+    technical_score, tech_details = calculate_technical_score(tech_data)
+    fundamental_score, fund_details = calculate_fundamental_score(fundamental_data) # 【新增】
+    total_score = (technical_score * 0.6) + (fundamental_score * 0.4)
+    print("\n\n=========================================")
+    print(f"      投資荷密斯-完整分析報告 ({stock_code} {stock_name})")
+    print("=========================================")
     
+    print(f"\n📈 綜合評分: {total_score:.1f} / 100.0")
+    print(f"(技術面 {technical_score}/100 * 60% + 基本面 {fundamental_score}/100 * 40%)")
+    
+    # --- 【新增】基本面報告區塊 ---
+    print("\n--- 🏦 基本面評分 ---")
+    print(f"分數: {fundamental_score} / 100")
+    if fundamental_data:
+        print(f"  • ROE: {fundamental_data['ROE']:.2f}% | 毛利率: {fundamental_data['毛利率']:.2f}% | 本益比: {fundamental_data['本益比']:.2f}")
+        print(f"  • 營收成長: {fundamental_data['營收成長率']:.2f}% | 負債比: {fundamental_data['負債比率']:.2f}%")
+        for detail in fund_details:
+            print(f"    - {detail}")
+    else:
+        print("  - 無法獲取基本面數據")
+        
+    print("\n--- 📊 技術面評分 ---")
+    print(f"分數: {technical_score} / 100")
+    for detail in tech_details:
+        print(f"  - {detail}")
+
     if tech_data is not None and not tech_data.empty:
         # 計算綜合評分
         technical_score, scoring_details = calculate_technical_score(tech_data)
@@ -427,3 +490,64 @@ if __name__ == "__main__":
         print("  1. 網路連線問題")
         print("  2. 股票代碼錯誤")
         print("  3. 該股票暫停交易")
+'''
+if __name__ == "__main__":
+    STOCK_MAP = {
+        "2330": "台積電", "2317": "鴻海", "2454": "聯發科", "2308": "台達電",
+        "2382": "廣達", "2881": "富邦金", "2891": "中信金", "2882": "國泰金"
+    }
+    stock_code = "2330"
+    stock_ticker = f"{stock_code}.TW"
+    stock_name = STOCK_MAP.get(stock_code, stock_code)
+
+    print(f"開始為 {stock_code} {stock_name} 生成綜合投資評估報告...")
+    print("-" * 60)
+
+    # --- 1. 執行所有基礎分析 ---
+    tech_data = analyze_stock_technicals(stock_ticker)
+    fundamental_data = analyze_stock_fundamentals(stock_ticker)
+    
+    # 檢查數據是否成功獲取
+    if tech_data is None or tech_data.empty:
+        print(f"❌ 無法獲取 {stock_code} 的技術資料，無法產生報告。")
+    else:
+        # --- 2. 獲取所有評估需要的輸入資料 ---
+        technical_score, tech_details = calculate_technical_score(tech_data)
+        
+        signal_generator = TradingSignalGenerator()
+        trading_signal = signal_generator.generate_signal(tech_data, technical_score)
+        
+        # --- 3. 執行綜合評估 ---
+        evaluator = ComprehensiveEvaluator()
+        
+        # 取得各維度評估的詳細結果，以傳遞給報告生成器
+        fund_score, fund_result = evaluator.evaluate_fundamental_quality(fundamental_data)
+        tech_score_norm, tech_result = evaluator.evaluate_technical_strength(tech_data, technical_score)
+        risk_score, risk_result = evaluator.evaluate_risk_profile(tech_data, fundamental_data)
+        momentum_score, momentum_result = evaluator.evaluate_momentum(tech_data)
+        
+        # 產生最終的綜合評估物件
+        evaluation = evaluator.generate_comprehensive_evaluation(
+            tech_data=tech_data,
+            tech_score=technical_score,
+            fundamental_data=fundamental_data,
+            trading_signal=trading_signal
+        )
+        
+        # --- 4. 格式化並印出最終報告 ---
+        latest_price = tech_data.iloc[-1]['Close']
+        
+        # 呼叫新的報告格式化函式
+        final_report = format_comprehensive_report(
+            evaluation=evaluation,
+            stock_code=stock_code,
+            stock_name=stock_name,
+            fund_result=fund_result,
+            tech_result=tech_result,
+            risk_result=risk_result,
+            momentum_result=momentum_result,
+            current_price=latest_price,
+            fundamental_data=fundamental_data
+        )
+        
+        print(final_report)
