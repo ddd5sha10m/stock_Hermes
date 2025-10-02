@@ -11,12 +11,44 @@ from fundamental_analyzer import analyze_stock_fundamentals
 from trading_signals import TradingSignalGenerator
 from comprehensive_evaluator import ComprehensiveEvaluator
 
+def get_valid_ticker(stock_code: str):
+    """
+    智能獲取有效的 ticker
+    優先嘗試 .TW (上市)，如果失敗則嘗試 .TWO (上櫃)
+    """
+    import yfinance as yf
+    
+    # 先嘗試 .TW (上市)
+    ticker_tw = f"{stock_code}.TW"
+    try:
+        test_data = yf.Ticker(ticker_tw).history(period="5d")
+        if not test_data.empty:
+            return ticker_tw, "TW"
+    except:
+        pass
+    
+    # 如果 .TW 失敗，嘗試 .TWO (上櫃)
+    ticker_two = f"{stock_code}.TWO"
+    try:
+        test_data = yf.Ticker(ticker_two).history(period="5d")
+        if not test_data.empty:
+            return ticker_two, "TWO"
+    except:
+        pass
+    
+    # 都失敗則返回 None
+    return None, None
+
 def run_comprehensive_analysis_for_stock(stock_code: str, stock_name: str):
     """
     對單一股票執行完整的綜合評估分析
     包含技術面、基本面、風險評估、動能分析
     """
-    stock_ticker = f"{stock_code}.TW"
+    # 智能獲取正確的 ticker
+    stock_ticker, market = get_valid_ticker(stock_code)
+    
+    if stock_ticker is None:
+        return None
     
     try:
         # 1. 執行技術分析
@@ -115,32 +147,55 @@ if __name__ == "__main__":
 
     # 遍歷股票清單
     total_stocks = len(STOCK_LIST)
-    for i, (stock_code, stock_name) in enumerate(STOCK_LIST.items(), 1):
-        
-        print(f"[{i}/{total_stocks}] 正在分析: {stock_code} {stock_name}...", end=" ")
-        
-        try:
-            # 對每一支股票執行完整的綜合評估
-            result = run_comprehensive_analysis_for_stock(stock_code, stock_name)
+    user_interrupted = False
+    
+    try:
+        for i, (stock_code, stock_name) in enumerate(STOCK_LIST.items(), 1):
             
-            # 如果分析成功，將結果加入列表
-            if result:
-                all_results.append(result)
-                success_count += 1
-                print(f"✓ 完成 (綜合評分: {result['綜合評分']:.1f})")
-            else:
-                fail_count += 1
-                print("✗ 數據不足")
+            print(f"[{i}/{total_stocks}] 正在分析: {stock_code} {stock_name}...", end=" ")
+            
+            try:
+                # 對每一支股票執行完整的綜合評估
+                result = run_comprehensive_analysis_for_stock(stock_code, stock_name)
                 
-        except Exception as e:
-            fail_count += 1
-            print(f"✗ 錯誤: {str(e)[:50]}")
-            continue
+                # 如果分析成功，將結果加入列表
+                if result:
+                    all_results.append(result)
+                    success_count += 1
+                    print(f"✓ 完成 (綜合評分: {result['綜合評分']:.1f})")
+                else:
+                    fail_count += 1
+                    print("✗ 數據不足")
+                    
+            except KeyboardInterrupt:
+                # 不要在這裡捕獲，讓它往外層傳遞
+                raise
+            except Exception as e:
+                fail_count += 1
+                print(f"✗ 錯誤: {str(e)[:50]}")
+                continue
+                
+    except KeyboardInterrupt:
+        user_interrupted = True
+        print("\n\n" + "=" * 80)
+        print("⚠️  偵測到使用者中斷 (Ctrl+C)")
+        print(f"已完成 {success_count + fail_count}/{total_stocks} 支股票的分析")
+        print("=" * 80)
+        
+        if success_count == 0:
+            print("\n沒有任何成功分析的股票，無法產生報告。")
+            print("程式結束。")
+            exit(0)
     
     print("\n" + "=" * 80)
-    print(f"掃描完成！成功: {success_count} 支 | 失敗: {fail_count} 支")
+    print(f"掃描{'中斷' if user_interrupted else '完成'}！成功: {success_count} 支 | 失敗: {fail_count} 支")
     print("=" * 80)
-    print("\n正在進行排序與報告生成...")
+    
+    if user_interrupted and success_count > 0:
+        print(f"\n雖然掃描被中斷，但仍有 {success_count} 支股票成功分析")
+        print("正在使用已完成的數據產生報告...")
+    elif not user_interrupted:
+        print("\n正在進行排序與報告生成...")
 
     # 將結果列表轉換為 Pandas DataFrame
     results_df = pd.DataFrame(all_results)
@@ -151,14 +206,14 @@ if __name__ == "__main__":
         # 根據「綜合評分」進行降序排序
         ranked_df = results_df.sort_values(by="綜合評分", ascending=False)
         
-        # 選出前 50 名
-        top_50_df = ranked_df.head(50)
+        # 選出前 200 名
+        top_200_df = ranked_df.head(200)
 
         # --- 產生最終報告 ---
         
-        # 1. 在終端機印出 Top 50 排行榜
+        # 1. 在終端機印出 Top 200 排行榜
         print("\n\n" + "=" * 100)
-        print(f"           💎 投資荷密斯 Top 50 綜合投資價值排行榜 💎")
+        print(f"           💎 投資荷密斯 Top 200 綜合投資價值排行榜 💎")
         print(f"           掃描時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 100)
         
@@ -168,7 +223,7 @@ if __name__ == "__main__":
         pd.set_option('display.unicode.east_asian_width', True)
         
         # 將 DataFrame 的索引設為排名 (從 1 開始)
-        top_50_df.index = range(1, len(top_50_df) + 1)
+        top_200_df.index = range(1, len(top_200_df) + 1)
         
         # 選擇要顯示的欄位（簡化版）
         display_columns = [
@@ -177,42 +232,42 @@ if __name__ == "__main__":
             "信心度", "倉位建議"
         ]
         
-        print(top_50_df[display_columns].to_string())
+        print(top_200_df[display_columns].to_string())
         
-        # 2. 將完整的 Top 50 結果儲存為 CSV 檔案
+        # 2. 將完整的 Top 200 結果儲存為 CSV 檔案
         today_str = datetime.now().strftime('%Y%m%d_%H%M')
         csv_filename = f"investment_hermis_top50_{today_str}.csv"
         
         try:
-            top_50_df.to_csv(csv_filename, index_label="排名", encoding='utf-8-sig')
-            print(f"\n\n>>> ✓ Top 50 完整結果已成功儲存至檔案: {csv_filename}")
+            top_200_df.to_csv(csv_filename, index_label="排名", encoding='utf-8-sig')
+            print(f"\n\n>>> ✓ Top 200 完整結果已成功儲存至檔案: {csv_filename}")
         except Exception as e:
             print(f"\n\n>>> ✗ 儲存 CSV 檔案失敗: {e}")
         
         # 3. 產生統計摘要
         print("\n" + "=" * 100)
         print("📊 統計摘要:")
-        print(f"   • 平均綜合評分: {top_50_df['綜合評分'].mean():.1f}")
-        print(f"   • 平均技術評分: {top_50_df['技術評分'].mean():.1f}")
-        print(f"   • 平均基本面評分: {top_50_df['基本面評分'].mean():.1f}")
+        print(f"   • 平均綜合評分: {top_200_df['綜合評分'].mean():.1f}")
+        print(f"   • 平均技術評分: {top_200_df['技術評分'].mean():.1f}")
+        print(f"   • 平均基本面評分: {top_200_df['基本面評分'].mean():.1f}")
         
         # 訊號分布
-        signal_counts = top_50_df['交易訊號'].value_counts()
+        signal_counts = top_200_df['交易訊號'].value_counts()
         print(f"\n🎯 交易訊號分布:")
         for signal, count in signal_counts.items():
-            print(f"   • {signal}: {count} 支 ({count/len(top_50_df)*100:.1f}%)")
+            print(f"   • {signal}: {count} 支 ({count/len(top_200_df)*100:.1f}%)")
         
         # 風險等級分布
-        risk_counts = top_50_df['風險等級'].value_counts()
+        risk_counts = top_200_df['風險等級'].value_counts()
         print(f"\n⚡ 風險等級分布:")
         for risk, count in risk_counts.items():
-            print(f"   • {risk}: {count} 支 ({count/len(top_50_df)*100:.1f}%)")
+            print(f"   • {risk}: {count} 支 ({count/len(top_200_df)*100:.1f}%)")
         
         # 投資等級分布
-        grade_counts = top_50_df['投資等級'].value_counts()
+        grade_counts = top_200_df['投資等級'].value_counts()
         print(f"\n🏆 投資等級分布:")
         for grade, count in grade_counts.items():
-            print(f"   • {grade}: {count} 支 ({count/len(top_50_df)*100:.1f}%)")
+            print(f"   • {grade}: {count} 支 ({count/len(top_200_df)*100:.1f}%)")
         
     end_time = time.time()
     elapsed_time = end_time - start_time
