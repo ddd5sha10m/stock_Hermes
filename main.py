@@ -494,9 +494,9 @@ if __name__ == "__main__":
 if __name__ == "__main__":
     STOCK_MAP = {
         "2330": "台積電", "2317": "鴻海", "2454": "聯發科", "2308": "台達電",
-        "2382": "廣達", "2881": "富邦金", "2891": "中信金", "2882": "國泰金"
+        "2382": "廣達", "2881": "富邦金", "2891": "中信金", "2882": "國泰金","6231":"系微",
     }
-    stock_code = "2330"
+    stock_code = "6231"
     stock_ticker = f"{stock_code}.TW"
     stock_name = STOCK_MAP.get(stock_code, stock_code)
 

@@ -58,10 +58,43 @@ st.markdown("""
 
 @st.cache_data(ttl=300)  # 快取5分鐘
 def load_all_data(stock_code):
-    """一次性載入所有需要的數據 (技術面 + 基本面)"""
-    stock_ticker = f"{stock_code}.TW"
-    tech_data = analyze_stock_technicals(stock_ticker)
-    fundamental_data = analyze_stock_fundamentals(stock_ticker)
+    """
+    一次性載入所有需要的數據，並自動嘗試 .TW 和 .TWO 後綴。
+    """
+    print(f"\n--- 開始載入 {stock_code} 的數據 ---")
+    
+    # 1. 優先嘗試 .TW (上市市場)
+    ticker_tw = f"{stock_code}.TW"
+    print(f"嘗試使用 {ticker_tw} (上市市場)...")
+    tech_data = analyze_stock_technicals(ticker_tw)
+    
+    successful_ticker = ""
+
+    # 2. 檢查 .TW 的結果
+    if tech_data is not None and not tech_data.empty:
+        # .TW 成功
+        successful_ticker = ticker_tw
+        print(f"成功使用 {successful_ticker} 獲取技術數據。")
+    else:
+        # 3. 如果 .TW 失敗，則切換至 .TWO (上櫃市場)
+        print(f"使用 {ticker_tw} 失敗或無數據，切換至 .TWO 再次嘗試...")
+        ticker_two = f"{stock_code}.TWO"
+        tech_data = analyze_stock_technicals(ticker_two)
+        
+        # 4. 檢查 .TWO 的結果
+        if tech_data is not None and not tech_data.empty:
+            # .TWO 成功
+            successful_ticker = ticker_two
+            print(f"成功使用 {successful_ticker} 獲取技術數據。")
+        else:
+            # 兩種嘗試都失敗
+            print(f"!!! 使用 {ticker_tw} 和 {ticker_two} 均無法獲取數據。")
+            return None, None
+
+    # 5. 使用成功的 ticker 來獲取基本面數據
+    print(f"繼續使用 {successful_ticker} 獲取基本面數據...")
+    fundamental_data = analyze_stock_fundamentals(successful_ticker)
+    
     return tech_data, fundamental_data
 
 def create_candlestick_chart(data, stock_name):

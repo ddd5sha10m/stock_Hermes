@@ -24,9 +24,9 @@ class ComprehensiveEvaluator:
     def __init__(self):
         # 權重配置
         self.weights = {
-            'fundamental': 0.40,  # 基本面權重
-            'technical': 0.35,    # 技術面權重
-            'risk': 0.15,        # 風險評估權重
+            'fundamental': 0.3,  # 基本面權重
+            'technical': 0.4,    # 技術面權重
+            'risk': 0.2,        # 風險評估權重
             'momentum': 0.10     # 動能評估權重
         }
         
