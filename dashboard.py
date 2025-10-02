@@ -16,7 +16,7 @@ from stock_list import STOCK_LIST
 
 # 設定頁面配置
 st.set_page_config(
-    page_title="投資跟密斯 - 股票技術分析儀表板",
+    page_title="投資荷密斯 - 股票技術分析儀表板",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -280,7 +280,7 @@ def create_candlestick_chart(data, stock_name):
     title=dict(
         text=f"{stock_name} 技術分析圖表",
         x=0.5,   # 水平置中
-        y=0.98,  # 調高一點
+        y=0.99,  # 調高一點
         xanchor="center",
         yanchor="top"
     ),
@@ -401,7 +401,7 @@ def main():
         analyze_button = st.button("🚀 開始評估", type="primary", use_container_width=True)
     
     if not analyze_button:
-        st.info("👈 請在左側選擇股票並點擊「開始評估」按鈕")
+        st.info("👈 請在左側選擇股票並點擊「開始評估」按鈕。投資有風險，此工具僅提供參考，購買前仍需自行評估，本站不承擔任何相關責任。")
         st.markdown("---")
         st.image("/Users/wdwddaniel/Downloads/stockH.png")
         return
