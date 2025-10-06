@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-股票技術分析儀表板啟動腳本
-自動檢查依賴套件並啟動Streamlit應用
+股票技術分析儀表板啟動腳本 - 更新版
 """
 
 import sys
 import subprocess
-import pkg_resources
 import importlib
 
 def check_and_install_packages():
@@ -18,18 +16,16 @@ def check_and_install_packages():
         'pandas': 'pandas>=2.0.0',
         'numpy': 'numpy>=1.24.0',
         'yfinance': 'yfinance>=0.2.18',
-        'pandas_ta': 'pandas-ta>=0.3.14b0',
-        'plotly': 'plotly>=5.15.0'
+        'pandas_ta': 'pandas_ta>=0.3.14b0',
+        'plotly': 'plotly>=5.15.0',
+        'requests': 'requests>=2.31.0'
     }
     
     missing_packages = []
     
     for package, requirement in required_packages.items():
         try:
-            if package == 'pandas_ta':
-                importlib.import_module('pandas_ta')
-            else:
-                importlib.import_module(package)
+            importlib.import_module(package)
             print(f"✓ {package} 已安裝")
         except ImportError:
             missing_packages.append(requirement)
@@ -53,8 +49,11 @@ def check_required_files():
     required_files = [
         'dashboard.py',
         'technical_analyzer.py',
-        'main.py',
+        'fundamental_analyzer.py',
         'trading_signals.py',
+        'comprehensive_evaluator.py',
+        'market_analyzer.py',
+        'chip_analyzer.py',
         'stock_list.py'
     ]
     
@@ -79,9 +78,13 @@ def check_required_files():
 def start_dashboard():
     """啟動Streamlit儀表板"""
     
-    print("\n" + "="*50)
-    print("🚀 啟動股票技術分析儀表板...")
-    print("="*50)
+    print("\n" + "="*60)
+    print("🚀 啟動投資荷密斯 - 綜合投資分析儀表板")
+    print("="*60)
+    print("儀表板將在瀏覽器中自動開啟...")
+    print("如果沒有自動開啟，請手動訪問: http://localhost:8501")
+    print("按 Ctrl+C 可停止服務")
+    print("="*60)
     
     try:
         # 啟動Streamlit應用
@@ -89,6 +92,7 @@ def start_dashboard():
             sys.executable, "-m", "streamlit", "run", "dashboard.py",
             "--server.port", "8501",
             "--server.address", "localhost",
+            "--theme.base", "light",
             "--browser.serverAddress", "localhost",
             "--browser.gatherUsageStats", "false"
         ])
@@ -100,7 +104,7 @@ def start_dashboard():
 def main():
     """主程式"""
     
-    print("📈 股票技術分析儀表板 - 啟動檢查")
+    print("📈 投資荷密斯 - 綜合投資分析儀表板")
     print("="*50)
     
     # 檢查Python版本
@@ -108,8 +112,8 @@ def main():
         print("❌ 錯誤：需要Python 3.8或更高版本")
         print(f"   當前版本：Python {sys.version}")
         return
-    else:
-        print(f"✓ Python版本檢查通過: {sys.version}")
+    
+    print(f"✓ Python版本: {sys.version.split()[0]}")
     
     print("\n1. 檢查程式檔案...")
     if not check_required_files():
@@ -117,7 +121,7 @@ def main():
     
     print("\n2. 檢查套件依賴...")
     if not check_and_install_packages():
-        print("❌ 套件安裝失敗，請手動執行：pip install -r requirements.txt")
+        print("❌ 套件安裝失敗，請手動安裝缺少的套件")
         return
     
     print("\n✅ 所有檢查通過！")

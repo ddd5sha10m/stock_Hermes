@@ -179,7 +179,7 @@ class TradingSignalGenerator:
         
         return high_resistance and low_trend > 0
     
-    def generate_signal(self, data: pd.DataFrame, current_score: int) -> TradingSignal:
+    def generate_signal(self, data: pd.DataFrame, current_score: int, market_state: str) -> TradingSignal:
         """生成主要交易訊號"""
         latest = data.iloc[-1]
         current_price = latest['Close']
@@ -191,7 +191,7 @@ class TradingSignalGenerator:
         warnings = []
         
         # --- 1. 基於技術分數的基礎判斷 (調整門檻) ---
-        if current_score >= 70:  # 降低買入門檻
+        if current_score >= 65:  # 降低買入門檻
             signal_type = 'BUY'
             reasons.append(f"技術綜合評分達{current_score}分，多項指標看好")
         elif current_score <= 40:  # 提高賣出門檻
@@ -201,6 +201,15 @@ class TradingSignalGenerator:
         else:
             signal_type = 'HOLD'
             reasons.append(f"技術評分{current_score}分，訊號不夠明確，建議觀望")
+        if market_state == "空頭" and signal_type == "BUY":
+            signal_type = "HOLD" # 在空頭市場中，將買入訊號降級為觀望
+            reasons.append("⚠️ 大盤處於空頭趨勢，暫緩買入")
+            warnings.append("大盤逆風，逆勢操作風險較高")
+            confidence -= 20 # 大幅降低信心度
+        elif market_state == "多頭" and signal_type == "BUY":
+            reasons.append("👍 大盤處於多頭趨勢，順勢操作")
+            confidence += 10 # 順風時增加信心度
+
         
         # --- 2. 支撐壓力位分析 ---
         support, resistance, support_levels, resistance_levels = self.calculate_support_resistance(data)

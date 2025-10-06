@@ -3,23 +3,22 @@
 import yfinance as yf
 import pandas as pd
 
-def analyze_stock_fundamentals(ticker_str: str):
+def analyze_stock_fundamentals(ticker_obj):
     """
     抓取並計算指定股票的13項關鍵基本面指標
     """
-    print(f"===== 開始分析 {ticker_str} 的基本面數據... =====")
+    print(f"===== 開始分析 {ticker_obj} 的基本面數據... =====")
     
     try:
-        ticker = yf.Ticker(ticker_str)
         
         # 獲取不同類型的財報數據
-        info = ticker.info
-        financials = ticker.financials
-        balance_sheet = ticker.balance_sheet
-        cashflow = ticker.cashflow
+        info = ticker_obj.info
+        financials = ticker_obj.financials
+        balance_sheet = ticker_obj.balance_sheet
+        cashflow = ticker_obj.cashflow
         
         if financials.empty or balance_sheet.empty or cashflow.empty:
-            print(f"警告：{ticker_str} 的財報數據不完整，無法進行基本面分析。")
+            print(f"警告：{ticker_obj} 的財報數據不完整，無法進行基本面分析。")
             return None
 
         # --- 數據提取 (以最新的年度財報為主) ---
@@ -82,7 +81,7 @@ def analyze_stock_fundamentals(ticker_str: str):
         inventory = last_balance_sheet.get('Inventory', 0)
         quick_ratio = (current_assets - inventory) / current_liabilities if current_liabilities else 0
         
-        print(f"===== {ticker_str} 基本面數據分析完成！ =====")
+        print(f"===== {ticker_obj} 基本面數據分析完成！ =====")
 
         return {
             "EPS": eps,
@@ -101,5 +100,5 @@ def analyze_stock_fundamentals(ticker_str: str):
         }
         
     except Exception as e:
-        print(f"錯誤：分析 {ticker_str} 基本面時發生錯誤: {e}")
+        print(f"錯誤：分析 {ticker_obj} 基本面時發生錯誤: {e}")
         return None

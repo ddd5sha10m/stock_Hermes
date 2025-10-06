@@ -1,4 +1,4 @@
-# comprehensive_evaluator.py - 綜合投資價值評估系統
+# comprehensive_evaluator.py - 最終整合版評估系統
 
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
@@ -6,239 +6,128 @@ import pandas as pd
 
 @dataclass
 class InvestmentEvaluation:
-    """綜合投資評估結果"""
-    overall_score: float  # 總體評分 (0-100)
-    investment_grade: str  # 投資等級 (A+到D-)
-    risk_level: str  # 風險等級 (低/中/高/極高)
-    time_horizon: str  # 適合投資期間
-    position_suggestion: str  # 倉位建議
-    core_thesis: str  # 核心投資論點
-    key_strengths: List[str]  # 主要優勢
-    key_risks: List[str]  # 主要風險
-    action_items: List[str]  # 具體行動建議
-    monitoring_points: List[str]  # 需要持續關注的指標
+    # (此資料結構不變)
+    overall_score: float; investment_grade: str; risk_level: str; time_horizon: str; position_suggestion: str; core_thesis: str; key_strengths: List[str]; key_risks: List[str]; action_items: List[str]; monitoring_points: List[str]
 
 class ComprehensiveEvaluator:
-    """綜合投資價值評估器"""
+    """綜合投資價值評估器 (單一職責)"""
     
     def __init__(self):
-        # 權重配置
+        # 權重配置 - 修正版本
         self.weights = {
-            'fundamental': 0.3,  # 基本面權重
-            'technical': 0.4,    # 技術面權重
-            'risk': 0.2,        # 風險評估權重
-            'momentum': 0.10     # 動能評估權重
+            'fundamental': 0.35,  # 基本面權重
+            'technical': 0.35,    # 技術面權重
+            'chip_flow': 0.15,    # 籌碼面權重 - 新增這行
+            'risk': 0.10,         # 風險評估權重
+            'momentum': 0.05      # 動能評估權重
         }
-        
-    def evaluate_fundamental_quality(self, fundamental_data: Dict) -> Tuple[float, Dict]:
+        # 確保權重總和為 1.0
+        total_weight = sum(self.weights.values())
+        if abs(total_weight - 1.0) > 0.001:
+            # 自動調整權重使其總和為 1.0
+            scale_factor = 1.0 / total_weight
+            for key in self.weights:
+                self.weights[key] *= scale_factor
+    
+    # 【整合】原 main.py 中的 calculate_fundamental_score 邏輯已完全移入此處
+    def evaluate_fundamental_quality(self, fundamental_data: Dict) -> Tuple[int, Dict]:
         """評估基本面品質"""
         if not fundamental_data:
             return 0, {'score': 0, 'grade': 'N/A', 'details': ['無基本面數據']}
             
-        score = 0
-        details = []
+        score = 0; details = []
         
-        # 1. 獲利能力評估 (40分)
-        profitability_score = 0
-        
-        # ROE評估
+        # 1. 獲利能力 (40分)
         roe = fundamental_data.get('ROE', 0)
-        if roe > 20:
-            profitability_score += 15
-            details.append(f"卓越ROE {roe:.1f}% - 管理層經營效率極佳")
-        elif roe > 15:
-            profitability_score += 10
-            details.append(f"優良ROE {roe:.1f}% - 穩定獲利能力")
-        elif roe > 8:
-            profitability_score += 5
-            details.append(f"合格ROE {roe:.1f}% - 獲利能力尚可")
-        else:
-            details.append(f"ROE偏低 {roe:.1f}% - 需關注獲利改善")
-            
-        # 毛利率評估
+        if roe > 15: score += 15; details.append(f"高ROE: {roe:.1f}% (+15)")
+        elif roe > 8: score += 8; details.append(f"良好ROE: {roe:.1f}% (+8)")
+        
         gross_margin = fundamental_data.get('毛利率', 0)
-        if gross_margin > 40:
-            profitability_score += 10
-            details.append(f"高毛利率 {gross_margin:.1f}% - 產品競爭力強")
-        elif gross_margin > 25:
-            profitability_score += 6
-            details.append(f"毛利率 {gross_margin:.1f}% - 產業地位穩固")
-        elif gross_margin > 15:
-            profitability_score += 3
-            details.append(f"毛利率 {gross_margin:.1f}% - 一般水準")
-            
-        # 營業利益率
+        if gross_margin > 30: score += 10; details.append(f"高毛利率: {gross_margin:.1f}% (+10)")
+        elif gross_margin > 15: score += 5; details.append(f"尚可毛利率: {gross_margin:.1f}% (+5)")
+
         op_margin = fundamental_data.get('營業利益率', 0)
-        if op_margin > 15:
-            profitability_score += 10
-            details.append(f"營業利益率 {op_margin:.1f}% - 營運效率優異")
-        elif op_margin > 8:
-            profitability_score += 5
-            details.append(f"營業利益率 {op_margin:.1f}% - 營運表現良好")
-            
-        # EPS
-        eps = fundamental_data.get('EPS', 0)
-        if eps > 5:
-            profitability_score += 5
-            details.append(f"EPS ${eps:.2f} - 每股獲利豐厚")
-        elif eps > 0:
-            profitability_score += 2
-            details.append(f"EPS ${eps:.2f} - 維持獲利")
-        else:
-            details.append("EPS為負 - 虧損中")
-            
-        score += profitability_score
+        if op_margin > 10: score += 10; details.append(f"高營業利益率: {op_margin:.1f}% (+10)")
+        elif op_margin > 5: score += 5; details.append(f"尚可營業利益率: {op_margin:.1f}% (+5)")
         
-        # 2. 成長性評估 (20分)
-        growth_score = 0
+        if fundamental_data.get('EPS', 0) > 0: score += 5; details.append(f"EPS為正: {fundamental_data.get('EPS', 0):.2f} (+5)")
+
+        # 2. 成長性 (20分)
         revenue_growth = fundamental_data.get('營收成長率', 0)
+        if revenue_growth > 10: score += 20; details.append(f"高速營收成長: {revenue_growth:.1f}% (+20)")
+        elif revenue_growth > 0: score += 10; details.append(f"營收正成長: {revenue_growth:.1f}% (+10)")
         
-        if revenue_growth > 20:
-            growth_score += 20
-            details.append(f"營收高速成長 {revenue_growth:.1f}% - 業務快速擴張")
-        elif revenue_growth > 10:
-            growth_score += 15
-            details.append(f"營收穩健成長 {revenue_growth:.1f}% - 成長動能佳")
-        elif revenue_growth > 0:
-            growth_score += 8
-            details.append(f"營收正成長 {revenue_growth:.1f}% - 業務穩定")
-        else:
-            details.append(f"營收衰退 {revenue_growth:.1f}% - 需關注轉機")
-            
-        score += growth_score
-        
-        # 3. 財務健康度 (25分)
-        financial_health_score = 0
-        
-        # 負債比率
-        debt_ratio = fundamental_data.get('負債比率', 100)
-        if debt_ratio < 40:
-            financial_health_score += 10
-            details.append(f"負債比 {debt_ratio:.1f}% - 財務結構健全")
-        elif debt_ratio < 60:
-            financial_health_score += 6
-            details.append(f"負債比 {debt_ratio:.1f}% - 財務槓桿適中")
-        else:
-            details.append(f"負債比 {debt_ratio:.1f}% - 財務槓桿偏高")
-            
-        # 流動比率
-        current_ratio = fundamental_data.get('流動比率', 0)
-        if current_ratio > 2:
-            financial_health_score += 8
-            details.append(f"流動比率 {current_ratio:.1f} - 短期償債能力強")
-        elif current_ratio > 1.5:
-            financial_health_score += 5
-            details.append(f"流動比率 {current_ratio:.1f} - 流動性充足")
-        elif current_ratio > 1:
-            financial_health_score += 2
-            details.append(f"流動比率 {current_ratio:.1f} - 流動性尚可")
-        else:
-            details.append(f"流動比率 {current_ratio:.1f} - 流動性風險")
-            
-        # 自由現金流
-        fcf = fundamental_data.get('自由現金流', 0)
-        if fcf > 0:
-            financial_health_score += 7
-            details.append("自由現金流為正 - 現金創造能力佳")
-        else:
-            details.append("自由現金流為負 - 需關注資金狀況")
-            
-        score += financial_health_score
-        
+        # 3. 財務健康 (25分)
+        if fundamental_data.get('負債比率', 100) < 50: score += 10; details.append(f"低負債比: {fundamental_data.get('負債比率', 100):.1f}% (+10)")
+        if fundamental_data.get('流動比率', 0) > 2: score += 8; details.append(f"高流動比率: {fundamental_data.get('流動比率', 0):.1f} (+8)")
+        if fundamental_data.get('自由現金流', 0) > 0: score += 7; details.append(f"自由現金流為正 (+7)")
+
         # 4. 價值評估 (15分)
-        valuation_score = 0
-        pe_ratio = fundamental_data.get('本益比', 999)
-        
-        if 0 < pe_ratio <= 12:
-            valuation_score += 15
-            details.append(f"本益比 {pe_ratio:.1f} - 估值偏低，具投資價值")
-        elif pe_ratio <= 20:
-            valuation_score += 10
-            details.append(f"本益比 {pe_ratio:.1f} - 估值合理")
-        elif pe_ratio <= 30:
-            valuation_score += 5
-            details.append(f"本益比 {pe_ratio:.1f} - 估值偏高，需有成長支撐")
-        elif pe_ratio > 0:
-            details.append(f"本益比 {pe_ratio:.1f} - 估值過高，風險較大")
+        pe = fundamental_data.get('本益比', 999)
+        if 0 < pe <= 15: score += 15; details.append(f"價值區間本益比: {pe:.1f} (+15)")
+        elif 15 < pe <= 25: score += 8; details.append(f"合理本益比: {pe:.1f} (+8)")
             
-        score += valuation_score
+        grade = 'A+' if score >= 80 else 'A' if score >= 70 else 'B+' if score >= 60 else 'B'
         
-        # 判定等級
-        if score >= 80:
-            grade = 'A+'
-        elif score >= 70:
-            grade = 'A'
-        elif score >= 60:
-            grade = 'B+'
-        elif score >= 50:
-            grade = 'B'
-        elif score >= 40:
-            grade = 'C+'
-        elif score >= 30:
-            grade = 'C'
-        else:
-            grade = 'D'
-            
-        return score, {
-            'score': score,
-            'grade': grade,
-            'details': details
-        }
+        return int(score), {'score': int(score), 'grade': grade, 'details': details}
+
+    # 【整合】原 main.py 中的 calculate_technical_score 邏輯已完全移入此處
     
-    def evaluate_technical_strength(self, tech_data: pd.DataFrame, tech_score: int) -> Tuple[float, Dict]:
+    def evaluate_technical_strength(self, data: pd.DataFrame) -> Tuple[int, Dict]:
         """評估技術面強度"""
-        if tech_data is None or tech_data.empty:
-            return 0, {'score': 0, 'strength': '無法評估', 'details': ['無技術數據']}
-            
-        latest = tech_data.iloc[-1]
-        score = tech_score  # 使用原始技術評分
-        details = []
+        score = 0; details = []
+        if data is None or data.empty: return 0, {'score': 0, 'strength': '無法評估', 'details': ['無技術數據']}
+        latest = data.iloc[-1]
         
-        # 趨勢強度評估
-        trend_strength = "不明"
-        if score >= 70:
-            trend_strength = "強勢上升"
-            details.append("技術面呈現強勢上升趨勢")
-        elif score >= 55:
-            trend_strength = "溫和上升"
-            details.append("技術面呈現溫和上升趨勢")
-        elif score >= 45:
-            trend_strength = "盤整"
-            details.append("技術面處於盤整格局")
-        elif score >= 30:
-            trend_strength = "溫和下降"
-            details.append("技術面呈現溫和下降趨勢")
-        else:
-            trend_strength = "弱勢下降"
-            details.append("技術面呈現弱勢下降趨勢")
-            
-        # 支撐壓力評估
-        if 'Support_Level' in latest.index and 'Resistance_Level' in latest.index:
-            support = latest['Support_Level']
-            resistance = latest['Resistance_Level']
-            current_price = latest['Close']
-            
-            support_distance = (current_price - support) / current_price * 100
-            resistance_distance = (resistance - current_price) / current_price * 100
-            
-            if support_distance < 5:
-                details.append(f"接近支撐位 (距離{support_distance:.1f}%)")
-            if resistance_distance < 5:
-                details.append(f"接近壓力位 (距離{resistance_distance:.1f}%)")
-                
-        # 動能評估
+        # (詳細的技術評分邏輯...)
+        trend_score=0
+        if 'Deviation_MA60' in latest.index:
+            deviation_60=latest['Deviation_MA60']
+            if deviation_60 > 0:
+                if deviation_60 <= 10: trend_score += 15; details.append(f"價格在60MA之上，乖離率健康 (+15)")
+                elif deviation_60 <= 20: trend_score += 10; details.append(f"價格在60MA之上但乖離稍大 (+10)")
+                else: trend_score += 5; details.append(f"價格乖離60MA過大，回調風險 (+5)")
+        if 'MA20' in latest.index and 'MA60' in latest.index and latest['MA20'] > latest['MA60']: trend_score += 10; details.append("20MA > 60MA，中期趨勢向上 (+10)")
+        if 'MA5' in latest.index and 'MA20' in latest.index and latest['MA5'] > latest['MA20']: trend_score += 5; details.append("5MA > 20MA，短期趨勢向上 (+5)")
+        score += trend_score; momentum_score=0
+        if 'K' in latest.index and 'D' in latest.index and 'MA60' in latest.index:
+            is_uptrend = latest['Close'] > latest['MA60']
+            if latest['K'] > latest['D']: momentum_score += 5; details.append("K > D，短期動量向上 (+5)")
+            if is_uptrend:
+                if latest['K'] < 30: momentum_score += 8; details.append("多頭趨勢中K<30，強勢回檔買點 (+8)")
+            else:
+                if latest['K'] < 20: momentum_score += 3; details.append("空頭趨勢中K<20，超賣反彈機會 (+3)")
         if 'RSI' in latest.index:
             rsi = latest['RSI']
-            if rsi > 70:
-                details.append(f"RSI {rsi:.1f} - 短期超買")
-            elif rsi < 30:
-                details.append(f"RSI {rsi:.1f} - 短期超賣")
-                
-        return score, {
-            'score': score,
-            'strength': trend_strength,
-            'details': details
-        }
+            if 30 <= rsi <= 70: momentum_score += 5; details.append(f"RSI={rsi:.1f}在健康區間 (+5)")
+        if all(col in latest.index for col in['DIF','DEM']):
+            if len(data) >= 5:
+                dif_trend = latest['DIF'] - data.iloc[-5]['DIF']
+                if latest['DIF'] > latest['DEM'] and latest['DIF'] > 0 and dif_trend > 0: momentum_score += 10; details.append("MACD零軸上方且加速向上 (+10)")
+        score += momentum_score; bb_score=0
+        if all(col in latest.index for col in['Close','BB_Upper','BB_Lower']):
+            if len(data) >= 5:
+                if latest['Close'] > latest['BB_Upper']: bb_score += 10; details.append("突破布林上軌，強勢訊號 (+10)")
+        score += bb_score; volume_score=0
+        if 'Volume_Ratio' in latest.index:
+            vol_ratio=latest['Volume_Ratio']; vp_signal=latest.get('Volume_Price_Signal','');
+            if vp_signal == '價漲量增' and vol_ratio > 1.2: volume_score += 15; details.append(f"價漲量增(量比{vol_ratio:.1f}) (+15)")
+            elif vp_signal == '價跌量縮': volume_score += 5; details.append("價跌量縮，賣壓減輕 (+5)")
+        score += volume_score; risk_penalty=0
+        if 'Volatility_Risk' in latest.index:
+            vol_risk = latest['Volatility_Risk']
+            if vol_risk > 7: risk_penalty += 10; details.append(f"高波動率{vol_risk:.1f}% (-10)")
+        score -= risk_penalty
+    
+        # ADX 趨勢強度調整
+        if 'ADX_14' in latest.index:
+            adx = latest['ADX_14']
+            if adx > 25 and score > 60:
+                trend_bonus = int(score * 0.1); score += trend_bonus; details.append(f"強趨勢環境(ADX={adx:.1f})加成 (+{trend_bonus})")
+        
+        score = int(max(0, min(score, 100)))
+        strength = "強勢上升" if score >= 70 else "溫和上升" if score >= 55 else "盤整或下降"
+        return score, {'score': score, 'strength': strength, 'details': details}
     
     def evaluate_risk_profile(self, tech_data: pd.DataFrame, fundamental_data: Dict) -> Tuple[float, Dict]:
         """評估風險狀況 (分數越高風險越低)"""
@@ -359,26 +248,88 @@ class ComprehensiveEvaluator:
             'details': details
         }
     
+    def evaluate_chip_flow(self, chip_data: pd.DataFrame) -> Tuple[float, Dict]:
+        """評估法人籌碼流向 (分數越高越樂觀)"""
+        if chip_data is None or chip_data.empty or len(chip_data) < 3:
+            return 50, {'score': 50, 'grade': '中性', 'details': ['籌碼數據不足']}
+            
+        score = 50  # 中性起始分數
+        details = []
+
+        # 外資趨勢分析
+        foreign_trend = chip_data['外資買賣超'].head(3) # 取最近3天
+        if (foreign_trend > 0).all():
+            score += 25
+            details.append(f"外資連續 {len(foreign_trend)} 日買超 (+25)")
+        elif (foreign_trend < 0).all():
+            score -= 20
+            details.append(f"外資連續 {len(foreign_trend)} 日賣超 (-20)")
+        
+        # 投信趨勢分析 (投信的影響力通常更集中)
+        trust_trend = chip_data['投信買賣超'].head(3)
+        if (trust_trend > 0).all():
+            score += 30
+            details.append(f"投信連續 {len(trust_trend)} 日買超 (強烈訊號) (+30)")
+        elif (trust_trend < 0).all():
+            score -= 25
+            details.append(f"投信連續 {len(trust_trend)} 日賣超 (-25)")
+
+        # 當日法人同步動向
+        latest_trade = chip_data.iloc[0]
+        if latest_trade['外資買賣超'] > 0 and latest_trade['投信買賣超'] > 0:
+            score += 20
+            details.append("外資與投信今日同步買超 (+20)")
+        elif latest_trade['外資買賣超'] < 0 and latest_trade['投信買賣超'] < 0:
+            score -= 15
+            details.append("外資與投信今日同步賣超 (-15)")
+            
+        score = max(0, min(100, score)) # 確保分數在 0-100 之間
+
+        # 判定等級
+        if score >= 80: grade = '非常集中'
+        elif score >= 65: grade = '集中'
+        elif score >= 40: grade = '普通'
+        elif score >= 25: grade = '凌亂'
+        else: grade = '非常凌亂'
+            
+        return score, {'score': score, 'grade': grade, 'details': details}
+    
     def generate_comprehensive_evaluation(self, 
                                         tech_data: pd.DataFrame,
                                         tech_score: int,
                                         fundamental_data: Dict,
-                                        trading_signal) -> InvestmentEvaluation:
+                                        trading_signal,
+                                        market_state: str,
+                                        chip_data: pd.DataFrame) -> InvestmentEvaluation:
         """生成綜合投資評估"""
         
         # 各維度評估
         fund_score, fund_result = self.evaluate_fundamental_quality(fundamental_data)
-        tech_score_norm, tech_result = self.evaluate_technical_strength(tech_data, tech_score)
+        tech_score_norm, tech_result = self.evaluate_technical_strength(tech_data)
         risk_score, risk_result = self.evaluate_risk_profile(tech_data, fundamental_data)
         momentum_score, momentum_result = self.evaluate_momentum(tech_data)
+        chip_score, chip_result = self.evaluate_chip_flow(chip_data)
         
         # 計算綜合分數
         overall_score = (
-            fund_score * self.weights['fundamental'] +
-            tech_score_norm * self.weights['technical'] +
-            risk_score * self.weights['risk'] +
-            momentum_score * self.weights['momentum']
-        )
+        fund_score * self.weights.get('fundamental', 0.35) +
+        tech_score_norm * self.weights.get('technical', 0.35) +
+        chip_score * self.weights.get('chip_flow', 0.15) +
+        risk_score * self.weights.get('risk', 0.10) +
+        momentum_score * self.weights.get('momentum', 0.05)
+    )
+        # 市場狀態調整
+        adjustment_reason = ""
+        if market_state == '多頭' and overall_score >= 60:
+            adjustment = 10
+            overall_score += adjustment
+            adjustment_reason = f"大盤多頭趨勢加成 (+{adjustment}) "
+        elif market_state == '空頭':
+            adjustment_factor = 0.85
+            overall_score *= adjustment_factor
+            adjustment_reason = f"大盤空頭趨勢修正 (x{adjustment_factor}) "
+    
+        overall_score = round(max(0, min(100, overall_score)), 1)
         
         # 判定投資等級
         if overall_score >= 80:
@@ -395,6 +346,15 @@ class ComprehensiveEvaluator:
             investment_grade = "C (高風險投資)"
         else:
             investment_grade = "D (不建議投資)"
+        
+        if market_state == '空頭' and fund_score >= 70 and tech_score < 50:
+             core_thesis = f"{adjustment_reason}基本面優秀，但受大盤拖累，呈現價值浮現的機會"
+        elif fund_result['grade'] in ['A+', 'A'] and tech_result['strength'] in ["強勢上升"]:
+            core_thesis = f"{adjustment_reason}基本面優異且技術面向好，具備中長期投資價值"
+        elif fund_result['grade'] in ['B+', 'B'] and momentum_result['trend'] in ["強勁上升"]:
+            core_thesis = f"{adjustment_reason}基本面穩健，短期動能強勁，適合波段操作"
+        else:
+            core_thesis = f"{adjustment_reason}綜合評估一般，需要更多催化劑"
             
         # 建議投資期間
         if risk_result['level'] == "低" and momentum_result['trend'] in ["強勁上升", "溫和上升"]:
@@ -458,25 +418,28 @@ class ComprehensiveEvaluator:
         monitoring_points = []
         if tech_data is not None and not tech_data.empty:
             latest = tech_data.iloc[-1]
-            if 'Support_Level' in latest.index:
-                monitoring_points.append(f"支撐位 ${latest['Support_Level']:.2f}")
-            if 'Resistance_Level' in latest.index:
-                monitoring_points.append(f"壓力位 ${latest['Resistance_Level']:.2f}")
+        if 'Support_Level' in latest.index:
+            monitoring_points.append(f"支撐位 ${latest['Support_Level']:.2f}")
+        if 'Resistance_Level' in latest.index:
+            monitoring_points.append(f"壓力位 ${latest['Resistance_Level']:.2f}")
         monitoring_points.append("成交量變化")
         monitoring_points.append("營收月增率")
+        if chip_data is not None and not chip_data.empty:
+            monitoring_points.append("法人買賣超變化")
         
         return InvestmentEvaluation(
-            overall_score=round(overall_score, 1),
-            investment_grade=investment_grade,
-            risk_level=risk_result['level'],
-            time_horizon=time_horizon,
-            position_suggestion=position_suggestion,
-            core_thesis=core_thesis,
-            key_strengths=key_strengths,
-            key_risks=key_risks,
-            action_items=action_items,
-            monitoring_points=monitoring_points
-        )
+        overall_score=round(overall_score, 1),
+        investment_grade=investment_grade,
+        risk_level=risk_result['level'],
+        time_horizon=time_horizon,
+        position_suggestion=position_suggestion,
+        core_thesis=core_thesis,
+        key_strengths=key_strengths,
+        key_risks=key_risks,
+        action_items=action_items,
+        monitoring_points=monitoring_points
+    )
+
 
 def format_comprehensive_report(evaluation: InvestmentEvaluation, 
                               stock_code: str, 
@@ -484,6 +447,7 @@ def format_comprehensive_report(evaluation: InvestmentEvaluation,
                               fund_result: Dict,
                               tech_result: Dict,
                               risk_result: Dict,
+                              chip_result: Dict,
                               momentum_result: Dict,
                               current_price: float,
                               fundamental_data: Dict) -> str:
@@ -525,6 +489,7 @@ def format_comprehensive_report(evaluation: InvestmentEvaluation,
     output.append("\n📈 各維度評估:")
     output.append(f"   基本面: {fund_result['score']}/100 (等級: {fund_result['grade']})")
     output.append(f"   技術面: {tech_result['score']}/100 (趨勢: {tech_result['strength']})")
+    output.append(f"   籌碼面: {chip_result['score']}/100 (籌碼: {chip_result['grade']})")
     output.append(f"   風險面: {risk_result['score']}/100 (風險: {risk_result['level']})")
     output.append(f"   動能面: {momentum_result['score']}/100 (動能: {momentum_result['trend']})")
     
@@ -562,6 +527,9 @@ def format_comprehensive_report(evaluation: InvestmentEvaluation,
     
     output.append("\n【動能分析】")
     for detail in momentum_result['details']:
+        output.append(f"   • {detail}")
+    output.append("\n【籌碼面分析】"); # 新增
+    for detail in chip_result['details']: 
         output.append(f"   • {detail}")
     
     # 免責聲明
